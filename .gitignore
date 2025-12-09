@@ -1,2 +1,3 @@
 *.pt
+imagenette*/
 __pycache__/

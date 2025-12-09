@@ -72,7 +72,7 @@ class Discriminator(torch.nn.Module):
         x = self.activation(self.norm_l2(self.conv_l2(x)))
         x = self.activation(self.norm_l3(self.conv_l3(x)))
         x = self.output_activation(self.conv_l4(x))
-        return x
+        return x.view(x.size(0), -1)
 
 
 def init_weights(m: torch.nn.Module) -> None:
@@ -112,7 +112,7 @@ class GAN(torch.nn.Module):
         total_d_loss = 0.0
         total_g_loss = 0.0
         
-        for real_images in data_loader:
+        for real_images, _ in data_loader:
             batch_size = real_images.size(0)
             real_images = real_images.to(self.device)
             
@@ -120,14 +120,14 @@ class GAN(torch.nn.Module):
             optim_d.zero_grad()
             
             # Real images
-            real_labels = torch.ones(batch_size, 1, 1, 1, device=self.device)
+            real_labels = torch.ones(batch_size, 1, device=self.device)
             output_real = self.discriminator(real_images)
             d_loss_real = loss_fn(output_real, real_labels)
             
             # Fake images
             noise = torch.randn(batch_size, self.latent_dim, 1, 1, device=self.device)
             fake_images = self.generator(noise)
-            fake_labels = torch.zeros(batch_size, 1, 1, 1, device=self.device)
+            fake_labels = torch.zeros(batch_size, 1, device=self.device)
             output_fake = self.discriminator(fake_images.detach())
             d_loss_fake = loss_fn(output_fake, fake_labels)
             
@@ -139,7 +139,7 @@ class GAN(torch.nn.Module):
             # Train Generator
             optim_g.zero_grad()
             
-            fake_labels_for_g = torch.ones(batch_size, 1, 1, 1, device=self.device)  # Trick discriminator
+            fake_labels_for_g = torch.ones(batch_size, 1, device=self.device)  # Trick discriminator
             output_fake_for_g = self.discriminator(fake_images)
             g_loss = loss_fn(output_fake_for_g, fake_labels_for_g)
             
@@ -187,13 +187,24 @@ class GAN(torch.nn.Module):
 
 
 if __name__ == "__main__":    # Example usage
-    latent_dim = 32
-    img_shape = (1, 28, 28)
-    
-    gan = GAN(latent_dim=latent_dim, img_shape=img_shape)
-    # Assuming dataset files are available
-    dataset_files = ["dog.pt", "violin.pt"]
-    dataset = DrawingSet(dataset_files)
-    data_loader = dataset.loader(batch_size=128, shuffle=True)
-    
-    gan.training_loop(data_loader, num_epochs=15)
+    import os
+    from torchvision import datasets, transforms # type: ignore
+    from torch.utils.data import DataLoader
+
+    # Paths
+    data_dir = "imagenette2-160"
+
+    # Transform: convert images to tensors
+    transform = transforms.Compose([
+        transforms.Resize(128),       # optional resize
+        transforms.CenterCrop(128),   # optional crop
+        transforms.ToTensor()         # convert to Tensor
+    ])
+
+    # Load training set
+    train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
+
+    # Initialize GAN for RGB images
+    gan_rgb = GAN(latent_dim=64, img_shape=(3, 128, 128))
+    gan_rgb.training_loop(train_loader, num_epochs=10)
