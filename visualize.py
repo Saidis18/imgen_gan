@@ -4,9 +4,9 @@ Visualize images from the dataset using matplotlib.
 """
 import matplotlib.pyplot as plt
 from gan import DrawingSet
+from typing import List
 
-
-def visualize_dataset(file_names, num_images=8, batch_size=128):
+def visualize_dataset(file_names: List[str], num_images: int = 8, batch_size: int = 128):
     """
     Visualize images from the dataset.
     
@@ -30,7 +30,7 @@ def visualize_dataset(file_names, num_images=8, batch_size=128):
     nrows = (num_images + ncols - 1) // ncols
     
     # Create figure
-    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 3*nrows))
+    _, axes = plt.subplots(nrows, ncols, figsize=(12, 3*nrows)) # type: ignore
     axes = axes.flatten()
     
     # Display images
@@ -56,7 +56,7 @@ def visualize_dataset(file_names, num_images=8, batch_size=128):
         axes[idx].axis('off')
     
     plt.tight_layout()
-    plt.show()
+    plt.show() # type: ignore
 
 
 if __name__ == "__main__":
