@@ -200,12 +200,38 @@ class GAN(torch.nn.Module):
             plt.axis('off') # type: ignore
         plt.tight_layout()
         plt.show() # type: ignore
+    
+    def warmup_cudnn(self, batch_size: int = 5) -> None:
+        if self.device.type == 'cuda' and torch.backends.cudnn.benchmark:
+            print("Warming up CUDNN...")
+            start_time = time.time()
+            self.generator.train()
+            self.discriminator.train()
+            loss_fn = torch.nn.BCELoss()
+
+            dummy_input = torch.randn(batch_size, self.latent_dim, 1, 1, device=self.device)
+            dummy_images = torch.randn(batch_size, *self.generator.img_shape, device=self.device)
+            dummy_labels = torch.ones(batch_size, 1, device=self.device)
+
+            d_out = self.discriminator(dummy_images)
+            d_loss = loss_fn(d_out, dummy_labels)
+            d_loss.backward()
+
+            _ = self.generator(dummy_input)
+            end_time = time.time()
+
+            print(f"CUDNN warmed up in {end_time - start_time:.2f} seconds.")
+        else:
+            print("CUDNN warmup skipped (not using CUDA or benchmark mode disabled).")
 
 
 if __name__ == "__main__":    # Example usage
     import os
     from torchvision import datasets, transforms # type: ignore
     from torch.utils.data import DataLoader
+
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.enabled = True
 
     # Paths
     data_dir = "imagenette2-160"
@@ -219,8 +245,9 @@ if __name__ == "__main__":    # Example usage
 
     # Load training set
     train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
-    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=64, shuffle=True) # type: ignore
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
 
     # Initialize GAN for RGB images
     gan_rgb = GAN(latent_dim=64, img_shape=(3, 128, 128))
+    gan_rgb.warmup_cudnn(batch_size=128)
     gan_rgb.training_loop(train_loader, num_epochs=10)
