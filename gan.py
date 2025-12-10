@@ -95,8 +95,8 @@ class GAN(torch.nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
         self.latent_dim = latent_dim
-        self.generator = Generator(latent_dim=self.latent_dim, gf=gf, img_shape=img_shape)
-        self.discriminator = Discriminator(gd=gd, slope=slope, img_shape=img_shape)
+        self.generator: Generator = Generator(latent_dim=self.latent_dim, gf=gf, img_shape=img_shape).to(self.device)
+        self.discriminator: Discriminator = Discriminator(gd=gd, slope=slope, img_shape=img_shape).to(self.device)
     
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         return self.generator(z)
@@ -158,8 +158,6 @@ class GAN(torch.nn.Module):
     def training_loop(self,
                     data_loader: torch.utils.data.DataLoader[torch.Tensor],
                     num_epochs:int) -> None:
-        self.discriminator = self.discriminator.to(self.device)
-        self.generator = self.generator.to(self.device)
         optim_d = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
         optim_g = torch.optim.Adam(self.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
         loss_fn = torch.nn.BCELoss()
