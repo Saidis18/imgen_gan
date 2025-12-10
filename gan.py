@@ -24,16 +24,22 @@ class Generator(torch.nn.Module):
         super().__init__()  # type: ignore
         self.img_shape = img_shape
         
-        self.conv_l1 = torch.nn.ConvTranspose2d(in_channels=latent_dim, out_channels=4*gf, kernel_size=4, stride=1, padding=0)
-        self.norm_l1 = torch.nn.BatchNorm2d(4*gf)
+        self.conv_l1 = torch.nn.ConvTranspose2d(in_channels=latent_dim, out_channels=16*gf, kernel_size=4, stride=1, padding=0)
+        self.norm_l1 = torch.nn.BatchNorm2d(16*gf)
 
-        self.conv_l2 = torch.nn.ConvTranspose2d(in_channels=4*gf, out_channels=2*gf, kernel_size=4, stride=2, padding=1)
-        self.norm_l2 = torch.nn.BatchNorm2d(2*gf)
+        self.conv_l2 = torch.nn.ConvTranspose2d(in_channels=16*gf, out_channels=8*gf, kernel_size=4, stride=2, padding=1)
+        self.norm_l2 = torch.nn.BatchNorm2d(8*gf)
+        
+        self.conv_l3 = torch.nn.ConvTranspose2d(in_channels=8*gf, out_channels=4*gf, kernel_size=4, stride=2, padding=1)
+        self.norm_l3 = torch.nn.BatchNorm2d(4*gf)
 
-        self.conv_l3 = torch.nn.ConvTranspose2d(in_channels=2*gf, out_channels=gf, kernel_size=4, stride=2, padding=2)
-        self.norm_l3 = torch.nn.BatchNorm2d(gf)
+        self.conv_l4 = torch.nn.ConvTranspose2d(in_channels=4*gf, out_channels=2*gf, kernel_size=4, stride=2, padding=1)
+        self.norm_l4 = torch.nn.BatchNorm2d(2*gf)
 
-        self.conv_l4 = torch.nn.ConvTranspose2d(in_channels=gf, out_channels=img_shape[0], kernel_size=4, stride=2, padding=1)
+        self.conv_l5 = torch.nn.ConvTranspose2d(in_channels=2*gf, out_channels=gf, kernel_size=4, stride=2, padding=1)
+        self.norm_l5 = torch.nn.BatchNorm2d(gf)
+
+        self.conv_l6 = torch.nn.ConvTranspose2d(in_channels=gf, out_channels=img_shape[0], kernel_size=4, stride=2, padding=1)
         
         self.output_activation = torch.nn.Sigmoid()
         self.activation = torch.nn.ReLU()
@@ -44,7 +50,9 @@ class Generator(torch.nn.Module):
         x = self.activation(self.norm_l1(self.conv_l1(z)))
         x = self.activation(self.norm_l2(self.conv_l2(x)))
         x = self.activation(self.norm_l3(self.conv_l3(x)))
-        x = self.output_activation(self.conv_l4(x))
+        x = self.activation(self.norm_l4(self.conv_l4(x)))
+        x = self.activation(self.norm_l5(self.conv_l5(x)))
+        x = self.output_activation(self.conv_l6(x))
         return x
 
 
@@ -60,7 +68,13 @@ class Discriminator(torch.nn.Module):
         self.conv_l3 = torch.nn.Conv2d(in_channels=2*gd, out_channels=4*gd, kernel_size=4, stride=2, padding=1)
         self.norm_l3 = torch.nn.BatchNorm2d(4*gd)
 
-        self.conv_l4 = torch.nn.Conv2d(in_channels=4*gd, out_channels=1, kernel_size=4, stride=2, padding=1)
+        self.conv_l4 = torch.nn.Conv2d(in_channels=4*gd, out_channels=8*gd, kernel_size=4, stride=2, padding=0)
+        self.norm_l4 = torch.nn.BatchNorm2d(8*gd)
+
+        self.conv_l5 = torch.nn.Conv2d(in_channels=8*gd, out_channels=16*gd, kernel_size=4, stride=2, padding=0)
+        self.norm_l5 = torch.nn.BatchNorm2d(16*gd)
+
+        self.conv_l6 = torch.nn.Conv2d(in_channels=16*gd, out_channels=1, kernel_size=1, stride=2, padding=0)
         
         self.output_activation = torch.nn.Sigmoid()
         self.activation = torch.nn.LeakyReLU(slope)
@@ -71,7 +85,9 @@ class Discriminator(torch.nn.Module):
         x = self.activation(self.conv_l1(x))
         x = self.activation(self.norm_l2(self.conv_l2(x)))
         x = self.activation(self.norm_l3(self.conv_l3(x)))
-        x = self.output_activation(self.conv_l4(x))
+        x = self.activation(self.norm_l4(self.conv_l4(x)))
+        x = self.activation(self.norm_l5(self.conv_l5(x)))
+        x = self.output_activation(self.conv_l6(x))
         return x.view(x.size(0), -1)
 
 
@@ -97,6 +113,8 @@ class GAN(torch.nn.Module):
         self.latent_dim = latent_dim
         self.generator: Generator = Generator(latent_dim=self.latent_dim, gf=gf, img_shape=img_shape).to(self.device)
         self.discriminator: Discriminator = Discriminator(gd=gd, slope=slope, img_shape=img_shape).to(self.device)
+        self.param_count = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Total trainable parameters: {self.param_count}")
     
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         return self.generator(z)
@@ -201,7 +219,7 @@ if __name__ == "__main__":    # Example usage
 
     # Load training set
     train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
-    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=64, shuffle=True) # type: ignore
 
     # Initialize GAN for RGB images
     gan_rgb = GAN(latent_dim=64, img_shape=(3, 128, 128))
