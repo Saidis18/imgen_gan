@@ -184,10 +184,12 @@ class GAN(torch.nn.Module):
             start_time = time.time()
             d_loss, g_loss = self.epoch(data_loader, optim_d, optim_g, loss_fn)
             end_time = time.time()
-            self._test_batch(test_latent)
+            self._test_batch(test_latent, epoch_idx)
             print(f"Epoch [{epoch_idx+1}/{num_epochs}] - Discriminator Loss: {d_loss:.4f}, Generator Loss: {g_loss:.4f} - Time: {end_time - start_time:.2f}s")
 
-    def _test_batch(self, test_latent: torch.Tensor) -> None:
+    def _test_batch(self, test_latent: torch.Tensor, epoch_idx: int) -> None:
+        if epoch_idx % 10 != 0:
+            return
         test_images = self.generator(test_latent).cpu().detach().numpy()
         plt.figure(figsize=(8, 8)) # type: ignore
         for i in range(16):
@@ -226,6 +228,7 @@ if __name__ == "__main__":    # Example usage
 
     # Initialize GAN for RGB images
     gan = GAN(latent_dim=64, img_shape=(3, 128, 128))
+    # For multi-GPU training run: NCCL_SHM_DISABLE=1 python gan.py
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs")
         gan.generator = torch.nn.DataParallel(gan.generator)  # type: ignore
