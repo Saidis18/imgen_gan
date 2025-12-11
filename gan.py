@@ -132,7 +132,7 @@ class GAN(torch.nn.Module):
         
         for real_images, _ in data_loader:
             batch_size = real_images.size(0)
-            real_images = real_images.to(self.device)
+            real_images = real_images.to(self.device, non_blocking=True)
             
             # Train Discriminator
             optim_d.zero_grad()
@@ -222,7 +222,7 @@ if __name__ == "__main__":    # Example usage
 
     # Load training set
     train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
-    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True) # type: ignore
 
     # Initialize GAN for RGB images
     gan_rgb = GAN(latent_dim=64, img_shape=(3, 128, 128))
