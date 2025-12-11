@@ -225,5 +225,8 @@ if __name__ == "__main__":    # Example usage
     train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
 
     # Initialize GAN for RGB images
-    gan_rgb = GAN(latent_dim=64, img_shape=(3, 128, 128))
-    gan_rgb.training_loop(train_loader, num_epochs=50)
+    gan_ = GAN(latent_dim=64, img_shape=(3, 128, 128))
+    gan_parallel = torch.nn.DataParallel(gan_)  # type: ignore
+    gan_parallel.to(gan_.device)
+    gan = gan_parallel.module
+    gan.training_loop(train_loader, num_epochs=50)
