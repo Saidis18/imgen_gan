@@ -224,7 +224,7 @@ if __name__ == "__main__":    # Example usage
 
     # Load training set
     train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
-    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=128, shuffle=True) # type: ignore
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=False, persistent_workers=False) # type: ignore
 
     # Initialize GAN for RGB images
     gan = GAN(latent_dim=64, img_shape=(3, 128, 128))
@@ -233,4 +233,4 @@ if __name__ == "__main__":    # Example usage
         print(f"Using {torch.cuda.device_count()} GPUs")
         gan.generator = torch.nn.DataParallel(gan.generator)  # type: ignore
         gan.discriminator = torch.nn.DataParallel(gan.discriminator)  # type: ignore
-    gan.training_loop(train_loader, num_epochs=50)
+    gan.training_loop(train_loader, num_epochs=200)
