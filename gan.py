@@ -113,6 +113,10 @@ class GAN(torch.nn.Module):
         self.latent_dim = latent_dim
         self.generator: Generator = Generator(latent_dim=self.latent_dim, gf=gf, img_shape=img_shape).to(self.device)
         self.discriminator: Discriminator = Discriminator(gd=gd, slope=slope, img_shape=img_shape).to(self.device)
+        if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs")
+            self.generator = torch.nn.DataParallel(self.generator)  # type: ignore
+            self.discriminator = torch.nn.DataParallel(self.discriminator)  # type: ignore
         self.param_count = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Total trainable parameters: {self.param_count}")
     
@@ -184,11 +188,11 @@ class GAN(torch.nn.Module):
             start_time = time.time()
             d_loss, g_loss = self.epoch(data_loader, optim_d, optim_g, loss_fn)
             end_time = time.time()
-            self._test_batch(test_latent, epoch_idx)
+            self._test_batch(test_latent, epoch_idx, num_epochs)
             print(f"Epoch [{epoch_idx+1}/{num_epochs}] - Discriminator Loss: {d_loss:.4f}, Generator Loss: {g_loss:.4f} - Time: {end_time - start_time:.2f}s")
 
-    def _test_batch(self, test_latent: torch.Tensor, epoch_idx: int) -> None:
-        if epoch_idx % 10 != 0:
+    def _test_batch(self, test_latent: torch.Tensor, epoch_idx: int, num_epochs: int) -> None:
+        if torch.cuda.device_count() > 1 and (epoch_idx % 20 != 0 or epoch_idx == num_epochs - 1):
             return
         test_images = self.generator(test_latent).cpu().detach().numpy()
         plt.figure(figsize=(8, 8)) # type: ignore
@@ -224,13 +228,9 @@ if __name__ == "__main__":    # Example usage
 
     # Load training set
     train_dataset = datasets.ImageFolder(os.path.join(data_dir, "train"), transform=transform)
-    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=False, persistent_workers=False) # type: ignore
+    train_loader: DataLoader[torch.Tensor] = DataLoader(train_dataset, batch_size=64, shuffle=True) # type: ignore
 
     # Initialize GAN for RGB images
     gan = GAN(latent_dim=64, img_shape=(3, 128, 128))
-    # For multi-GPU training run: NCCL_SHM_DISABLE=1 python gan.py
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs")
-        gan.generator = torch.nn.DataParallel(gan.generator)  # type: ignore
-        gan.discriminator = torch.nn.DataParallel(gan.discriminator)  # type: ignore
-    gan.training_loop(train_loader, num_epochs=200)
+    gan.training_loop(train_loader, num_epochs=200) # For multi-GPU training run: NCCL_SHM_DISABLE=1 python gan.py
+    torch.save(gan.state_dict(), "gan_model.pth")
